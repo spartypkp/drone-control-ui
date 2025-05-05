@@ -4,8 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { debounce } from 'lodash';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 interface Position {
 	x: number;
@@ -13,96 +12,13 @@ interface Position {
 }
 type InputMode = 'mouse' | 'touch';
 
-interface JoystickState {
-	position: Position;
-	isDragging: boolean;
-	isSpringBack: boolean;
-}
-// Custom hook for joystick logic
-const useJoystick = (initialPosition: Position, onPositionChange: (pos: Position) => void) => {
-	const [state, setState] = useState<JoystickState>({
-		position: initialPosition,
-		isDragging: false,
-		isSpringBack: false
-	});
+// Removing unused interface
+// interface JoystickState {
+// 	position: Position;
+// 	isDragging: boolean;
+// 	isSpringBack: boolean;
+// }
 
-	const springBackTimeoutRef = useRef<NodeJS.Timeout>();
-
-	const debouncedPositionChange = useCallback(
-		debounce((pos: Position) => {
-			onPositionChange(pos);
-		}, 16),
-		[onPositionChange]
-	);
-
-	const applyDeadZone = (pos: Position): Position => {
-		const deadZone = 10;
-		const center = 127;
-		return {
-			x: Math.abs(pos.x - center) < deadZone ? center : pos.x,
-			y: Math.abs(pos.y - center) < deadZone ? center : pos.y
-		};
-	};
-
-	const updatePosition = useCallback((pos: Position) => {
-		const positionWithDeadZone = applyDeadZone(pos);
-		setState(prev => ({ ...prev, position: positionWithDeadZone }));
-		debouncedPositionChange(positionWithDeadZone);
-	}, [debouncedPositionChange]);
-
-	const startSpringBack = useCallback(() => {
-		setState(prev => ({ ...prev, isSpringBack: true }));
-
-		// Clear any existing timeout
-		if (springBackTimeoutRef.current) {
-			clearTimeout(springBackTimeoutRef.current);
-		}
-
-		// Animate back to center
-		const steps = 10;
-		const duration = 200;
-		const stepTime = duration / steps;
-
-		const startPos = state.position;
-		const endPos = { x: 127, y: 127 };
-
-		let step = 0;
-
-		const animate = () => {
-			step++;
-			const progress = step / steps;
-			const newPos = {
-				x: startPos.x + (endPos.x - startPos.x) * progress,
-				y: startPos.y + (endPos.y - startPos.y) * progress
-			};
-
-			updatePosition(newPos);
-
-			if (step < steps) {
-				springBackTimeoutRef.current = setTimeout(animate, stepTime);
-			} else {
-				setState(prev => ({ ...prev, isSpringBack: false }));
-			}
-		};
-
-		animate();
-	}, [state.position, updatePosition]);
-
-	useEffect(() => {
-		return () => {
-			if (springBackTimeoutRef.current) {
-				clearTimeout(springBackTimeoutRef.current);
-			}
-		};
-	}, []);
-
-	return {
-		state,
-		setState,
-		updatePosition,
-		startSpringBack
-	};
-};
 interface JoystickControlProps {
 	onPositionChange: (position: Position) => void;
 	side: 'Left' | 'Right';
@@ -150,10 +66,39 @@ const JoystickControl: React.FC<JoystickControlProps> = ({ onPositionChange, sid
 		onPositionChange(newPosition);
 	};
 
-	const handleMouseEnd = (): void => {
-		if (inputMode !== 'mouse') return;
-		setIsDragging(false);
-	};
+	// Global event listeners - moving handlers inside useEffect to fix dependency issues
+	useEffect(() => {
+		// Define handlers inside useEffect to avoid dependency issues
+		const handleMouseEnd = (): void => {
+			if (inputMode !== 'mouse') return;
+			setIsDragging(false);
+		};
+
+		const handleTouchEnd = (): void => {
+			if (inputMode !== 'touch') return;
+			setIsDragging(false);
+		};
+
+		const handleGlobalMouseUp = () => {
+			if (inputMode === 'mouse') {
+				handleMouseEnd();
+			}
+		};
+
+		const handleGlobalTouchEnd = () => {
+			if (inputMode === 'touch') {
+				handleTouchEnd();
+			}
+		};
+
+		if (inputMode === 'mouse') {
+			window.addEventListener('mouseup', handleGlobalMouseUp);
+			return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+		} else {
+			window.addEventListener('touchend', handleGlobalTouchEnd);
+			return () => window.removeEventListener('touchend', handleGlobalTouchEnd);
+		}
+	}, [inputMode]); // Now we don't need to include the handlers in the dependency array
 
 	// Touch event handlers
 	const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>): void => {
@@ -174,34 +119,6 @@ const JoystickControl: React.FC<JoystickControlProps> = ({ onPositionChange, sid
 		setPosition(newPosition);
 		onPositionChange(newPosition);
 	};
-
-	const handleTouchEnd = (): void => {
-		if (inputMode !== 'touch') return;
-		setIsDragging(false);
-	};
-
-	// Global event listeners
-	useEffect(() => {
-		const handleGlobalMouseUp = () => {
-			if (inputMode === 'mouse') {
-				handleMouseEnd();
-			}
-		};
-
-		const handleGlobalTouchEnd = () => {
-			if (inputMode === 'touch') {
-				handleTouchEnd();
-			}
-		};
-
-		if (inputMode === 'mouse') {
-			window.addEventListener('mouseup', handleGlobalMouseUp);
-			return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
-		} else {
-			window.addEventListener('touchend', handleGlobalTouchEnd);
-			return () => window.removeEventListener('touchend', handleGlobalTouchEnd);
-		}
-	}, [inputMode]);
 
 	const getQuadrantInfo = (pos: Position): string => {
 		const xCenter = Math.abs(pos.x - 127) < 20;
@@ -368,7 +285,7 @@ const FlightControls: React.FC = () => {
 					<div className="mb-4">
 						<Card className="bg-black/50 text-white p-3">
 							<h2 className="font-bold mb-2">Altitude & Rotation Control</h2>
-							<p className="text-sm text-gray-300">This joystick controls the drone's vertical movement and rotation.</p>
+							<p className="text-sm text-gray-300">This joystick controls the drone&apos;s vertical movement and rotation.</p>
 							<ul className="text-xs text-gray-400 mt-2 list-disc pl-4">
 								<li>Vertical axis: Throttle (up/down movement)</li>
 								<li>Horizontal axis: Yaw (left/right rotation)</li>
@@ -387,7 +304,7 @@ const FlightControls: React.FC = () => {
 					<div className="mb-4">
 						<Card className="bg-black/50 text-white p-3">
 							<h2 className="font-bold mb-2">Direction Control</h2>
-							<p className="text-sm text-gray-300">This joystick controls the drone's directional movement.</p>
+							<p className="text-sm text-gray-300">This joystick controls the drone&apos;s directional movement.</p>
 							<ul className="text-xs text-gray-400 mt-2 list-disc pl-4">
 								<li>Vertical axis: Pitch (forward/backward tilt)</li>
 								<li>Horizontal axis: Roll (left/right tilt)</li>
@@ -409,7 +326,7 @@ const FlightControls: React.FC = () => {
 				<div className="max-w-2xl mx-auto">
 					<h2 className="text-sm font-semibold mb-2">About This Control System</h2>
 					<p className="text-xs text-gray-300">
-						This dual-joystick control system mimics professional drone controllers, using the standard "Mode 2" configuration
+						This dual-joystick control system mimics professional drone controllers, using the standard &quot;Mode 2&quot; configuration
 						popular in military and commercial UAV applications. Left stick controls altitude and rotation, while right stick
 						handles directional movement. This setup provides intuitive and precise control for complex flight maneuvers.
 					</p>
