@@ -302,6 +302,32 @@ const FlightControls: React.FC = () => {
 		setInputMode(isTouchDevice ? 'touch' : 'mouse');
 	}, []);
 
+	const getLeftControlDescription = (pos: Position): string => {
+		// Vertical axis: throttle (altitude)
+		// Horizontal axis: yaw (rotation)
+		const verticalText = pos.y > 137 ? "Increase Altitude" : pos.y < 117 ? "Decrease Altitude" : "Hold Altitude";
+		const horizontalText = pos.x > 137 ? "Rotate Right" : pos.x < 117 ? "Rotate Left" : "Hold Rotation";
+
+		if (Math.abs(pos.x - 127) < 20 && Math.abs(pos.y - 127) < 20) {
+			return "Hovering in place";
+		}
+
+		return `${verticalText}, ${horizontalText}`;
+	};
+
+	const getRightControlDescription = (pos: Position): string => {
+		// Vertical axis: pitch (forward/backward tilt)
+		// Horizontal axis: roll (left/right tilt)
+		const verticalText = pos.y > 137 ? "Forward" : pos.y < 117 ? "Backward" : "Hold Position";
+		const horizontalText = pos.x > 137 ? "Drift Right" : pos.x < 117 ? "Drift Left" : "Center";
+
+		if (Math.abs(pos.x - 127) < 20 && Math.abs(pos.y - 127) < 20) {
+			return "Stable Position";
+		}
+
+		return `${verticalText}, ${horizontalText}`;
+	};
+
 	return (
 		<main className="h-screen w-screen flex flex-col bg-gray-950">
 			<div className="bg-black/80 text-white p-4 flex flex-col items-center gap-4">
@@ -324,29 +350,62 @@ const FlightControls: React.FC = () => {
 						<div>
 							<span className="text-gray-400">Left Control: </span>
 							<span className="text-blue-400">({leftPosition.x}, {leftPosition.y})</span>
+							<p className="text-xs text-green-400 mt-1">{getLeftControlDescription(leftPosition)}</p>
 						</div>
 						<div>
 							<span className="text-gray-400">Right Control: </span>
 							<span className="text-blue-400">({rightPosition.x}, {rightPosition.y})</span>
+							<p className="text-xs text-green-400 mt-1">{getRightControlDescription(rightPosition)}</p>
 						</div>
 					</div>
 				</Card>
 			</div>
 
-			<div className="flex-1 flex">
-				<div className="w-1/2 p-8">
+			<div className="flex flex-col sm:flex-row flex-1">
+				<div className="w-full sm:w-1/2 p-4 sm:p-8">
+					<div className="mb-4">
+						<Card className="bg-black/50 text-white p-3">
+							<h2 className="font-bold mb-2">Altitude & Rotation Control</h2>
+							<p className="text-sm text-gray-300">This joystick controls the drone's vertical movement and rotation.</p>
+							<ul className="text-xs text-gray-400 mt-2 list-disc pl-4">
+								<li>Vertical axis: Throttle (up/down movement)</li>
+								<li>Horizontal axis: Yaw (left/right rotation)</li>
+							</ul>
+						</Card>
+					</div>
 					<JoystickControl
 						onPositionChange={setLeftPosition}
 						side="Left"
 						inputMode={inputMode}
 					/>
 				</div>
-				<div className="w-1/2 p-8">
+				<div className="w-full sm:w-1/2 p-4 sm:p-8">
+					<div className="mb-4">
+						<Card className="bg-black/50 text-white p-3">
+							<h2 className="font-bold mb-2">Direction Control</h2>
+							<p className="text-sm text-gray-300">This joystick controls the drone's directional movement.</p>
+							<ul className="text-xs text-gray-400 mt-2 list-disc pl-4">
+								<li>Vertical axis: Pitch (forward/backward tilt)</li>
+								<li>Horizontal axis: Roll (left/right tilt)</li>
+							</ul>
+						</Card>
+					</div>
 					<JoystickControl
 						onPositionChange={setRightPosition}
 						side="Right"
 						inputMode={inputMode}
 					/>
+				</div>
+			</div>
+
+			<div className="bg-black/80 text-white p-4">
+				<div className="max-w-2xl mx-auto">
+					<h2 className="text-sm font-semibold mb-2">About This Control System</h2>
+					<p className="text-xs text-gray-300">
+						This dual-joystick control system mimics professional drone controllers, using the standard "Mode 2" configuration
+						popular in military and commercial UAV applications. Left stick controls altitude and rotation, while right stick
+						handles directional movement. This setup provides intuitive and precise control for complex flight maneuvers.
+					</p>
 				</div>
 			</div>
 		</main>
